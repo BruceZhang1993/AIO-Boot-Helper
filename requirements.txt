@@ -1,0 +1,4 @@
+aiohttp
+tqdm
+pyunpack
+patool
