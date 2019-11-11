@@ -25,23 +25,28 @@ async def check_exists(command):
     return process.returncode == 0
 
 async def deploy_aio(device, noask=False):
-    copied_bytes = 0
-    def _copied(_):
-        pbar.update(CHUNK_SIZE)
-    command = 'grub-bios-setup'
-    if await check_exists(command):
-        print('Found: {}'.format(command))
-    else:
-        raise Exception('Please install grub2.')
+    commands = {
+        'grub-bios-setup': 'grub2',
+        'udisksctl': 'udisks2'
+    }
+    for k in commands:
+        if await check_exists(k):
+            print('Found: {}'.format(k))
+        else:
+            raise Exception('Please install {}.'.format(commands.get(k)))
     if not noask:
         print('[DANGEROUS] This command will wrap out {}, please backup your data first. Input `YES` and press [ENTER] to continue, [Ctrl-C] to abort: '.format(device), end='')
         if input() != "YES":
             raise Exception('User aborted.')
-    await run_command('sudo', 'umount', device, allow_fail=True)
+    print('Unmounting device {} ...'.format(device))
+    await run_command('udisksctl', 'unmount', '-f', '-b', device, allow_fail=True)
+    # await run_command('sudo', 'umount', device, allow_fail=True)
     await run_command('sudo', 'mkfs.vfat', '-n', 'AIOBOOT', device)
     aio_grub_dir = Path.cwd() / 'aio/aio_latest/AIO/grub/i386-pc'
     out, _, __ = await run_command('sudo', 'grub-bios-setup', '-d', aio_grub_dir, device)
     print(out)
+    print('Mounting device {} ...'.format(device))
+    await run_command('udisksctl', 'mount', '-b', device, allow_fail=True)
     print('Copying AIO files...')
     files_dir = Path.cwd() / 'aio/aio_latest'
     pbar = tqdm.tqdm(total=calculate_size(files_dir), unit='B', unit_scale=True)
@@ -50,4 +55,4 @@ async def deploy_aio(device, noask=False):
         shutil.copyfile(file, Path('/home/bruce/test') / file.relative_to(files_dir))
         pbar.update(file.stat().st_size)
     pbar.close()
-    print('Copied.')
+    print('All done. Have fun!')

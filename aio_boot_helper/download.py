@@ -8,6 +8,7 @@ from . import CACHE_LATEST_RELEASE, DOWN_FILENAME, CHUNK_SIZE
 GITHUB_API='https://api.github.com/repos/{owner}/{repo}/releases/latest'
 
 async def _get(session, url):
+    print('Fetching: {}'.format(url))
     async with session.get(url) as response:
         return await response.text()
 

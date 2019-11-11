@@ -22,13 +22,19 @@ async def deploy(args):
     else:
         raise Exception('Please specify devname.')
 
+async def auto_deploy(args):
+    if not args.device:
+        raise Exception('Please specify devname.')
+    await prepare(args)
+    await deploy(args)
+
 async def application(args):
     if args.command:
-        await globals().get(args.command)(args)
+        await globals().get(args.command.replace('-', '_'))(args)
 
 def main():
     try:
-        commands = ['prepare', 'deploy']
+        commands = ['prepare', 'deploy', 'auto-deploy']
         parser = argparse.ArgumentParser(description='AIO-Boot Helper')
         parser.add_argument('command', choices=commands, help='Command to use')
         parser.add_argument('device', nargs='?', default=None)
