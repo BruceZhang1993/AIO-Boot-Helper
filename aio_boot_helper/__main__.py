@@ -3,7 +3,7 @@ import argparse
 import sys
 from pathlib import Path
 from .download import get_latest_release, download
-from .util import decompress_file
+from .util import decompress_file, bcolors
 from .deploy import deploy_aio
 from . import DOWN_FILENAME
 
@@ -45,7 +45,7 @@ def main():
         loop = asyncio.get_event_loop()
         loop.run_until_complete(application(args))
     except Exception as e:
-        print('Exception: ' + str(e))
+        print(bcolors.FAIL + 'Exception: ' + str(e) + bcolors.UNDERLINE)
         sys.exit(1);
 
 if __name__ == "__main__":

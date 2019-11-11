@@ -3,11 +3,11 @@ import os
 from pathlib import Path
 import tqdm
 import shutil
-from .util import calculate_size
+from .util import calculate_size, bcolors
 from . import CHUNK_SIZE
 
 async def run_command(*args, allow_fail=False):
-    print('Running: {}'.format(' '.join(args)))
+    print(bcolors.BOLD + 'Running:' + bcolors.ENDC + ' {}'.format(' '.join(args)))
     process = await asyncio.create_subprocess_exec(
         *args,
         stderr=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE)
@@ -17,7 +17,7 @@ async def run_command(*args, allow_fail=False):
     return stdout.decode().strip(), stderr.decode().strip(), process.returncode
 
 async def check_exists(command):
-    print('Running: which {}'.format(command))
+    print(bcolors.BOLD + 'Running:' + bcolors.ENDC + ' which {}'.format(command))
     process = await asyncio.create_subprocess_exec(
         'which', command,
         stderr=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE)
@@ -35,7 +35,7 @@ async def deploy_aio(device, noask=False):
         else:
             raise Exception('Please install {}.'.format(commands.get(k)))
     if not noask:
-        print('[DANGEROUS] This command will wrap out {}, please backup your data first. Input `YES` and press [ENTER] to continue, [Ctrl-C] to abort: '.format(device), end='')
+        print(bcolors.WARNING + bcolors.BOLD + '[DANGEROUS] This command will wrap out {}, please BACKUP your data first. \nInput `YES` and press [ENTER] to continue, [Ctrl-C] to abort: '.format(device), end=bcolors.ENDC)
         if input() != "YES":
             raise Exception('User aborted.')
     print('Unmounting device {} ...'.format(device))
@@ -55,4 +55,4 @@ async def deploy_aio(device, noask=False):
         shutil.copyfile(file, Path('/home/bruce/test') / file.relative_to(files_dir))
         pbar.update(file.stat().st_size)
     pbar.close()
-    print('All done. Have fun!')
+    print(bcolors.OKGREEN + bcolors.BOLD + 'All done. Have fun!' + bcolors.ENDC)
