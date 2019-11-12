@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 import tqdm
 import shutil
+import re
 from .util import calculate_size, bcolors
 from . import CHUNK_SIZE
 
@@ -24,10 +25,18 @@ async def check_exists(command):
     await process.communicate()
     return process.returncode == 0
 
+async def get_mount_point(device):
+    await asyncio.sleep(1)
+    out, _, __ = await run_command('udisksctl', 'info', '-b', device + '1')
+    line = list(filter(lambda l: l.find('MountPoints:') >= 0, out.split('\n')))
+    return line[0].strip().split()[1]
+
 async def deploy_aio(device, noask=False):
     commands = {
         'grub-bios-setup': 'grub2',
-        'udisksctl': 'udisks2'
+        'udisksctl': 'udisks2',
+        'wipefs': 'util-linux',
+        'parted': 'parted'
     }
     for k in commands:
         if await check_exists(k):
@@ -40,21 +49,29 @@ async def deploy_aio(device, noask=False):
             raise Exception('User aborted.')
     print('Unmounting device {} ...'.format(device))
     await run_command('udisksctl', 'unmount', '-f', '-b', device, allow_fail=True)
+    await run_command('udisksctl', 'unmount', '-f', '-b', device + '1', allow_fail=True)
     await run_command('sudo', 'umount', device, allow_fail=True)
-    await run_command('sudo', 'mkfs.vfat', '-n', 'AIOBOOT', '-F', '32', device)
+    await run_command('sudo', 'wipefs', '--all', device)
+    await run_command('sudo', 'parted', device, 'mklabel', 'msdos')
+    await run_command('sudo', 'parted', '--align=opt', device, 'mkpart', 'primary', '0%', '100%')
+    await run_command('sudo', 'mkfs.vfat', '-n', 'AIOBOOT', '-F', '32', device + '1')
     aio_grub_dir = Path.cwd() / 'aio/aio_latest/AIO/grub/i386-pc'
-    out, _, __ = await run_command('sudo', 'grub-bios-setup', '-d', aio_grub_dir, device)
+    out, _, __ = await run_command('sudo', 'grub-install', '--target=i386-pc', device)
     print(out)
     print('Mounting device {} ...'.format(device))
-    await run_command('udisksctl', 'mount', '-b', device, allow_fail=True)
-    print('Copying AIO files...')
+    await asyncio.sleep(3)
+    await run_command('udisksctl', 'mount', '-b', device + '1')
+    mounting_point = await get_mount_point(device)
+    print('Copying AIO files to {} ...'.format(mounting_point))
     files_dir = Path.cwd() / 'aio/aio_latest'
     pbar = tqdm.tqdm(total=calculate_size(files_dir), unit='B', unit_scale=True)
     for file in [f for f in files_dir.glob('**/*') if f.is_file()]:
-        Path.mkdir((Path('/home/bruce/test') / file.relative_to(files_dir)).parent, parents=True, exist_ok=True)
-        shutil.copyfile(file, Path('/home/bruce/test') / file.relative_to(files_dir))
+        Path.mkdir((Path(mounting_point) / file.relative_to(files_dir)).parent, parents=True, exist_ok=True)
+        shutil.copyfile(file, Path(mounting_point) / file.relative_to(files_dir))
         pbar.update(file.stat().st_size)
     pbar.close()
     print('Unmounting device {} ...'.format(device))
-    await run_command('udisksctl', 'unmount', '-f', '-b', device, allow_fail=True)
+    await run_command('udisksctl', 'unmount', '-f', '-b', device + '1', allow_fail=True)
+    await run_command('sudo', 'sync', device, allow_fail=True)
+    await run_command('sudo', 'sync', device + '1', allow_fail=True)
     print(bcolors.OKGREEN + bcolors.BOLD + 'All done. Have fun!' + bcolors.ENDC)
