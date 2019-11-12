@@ -40,8 +40,8 @@ async def deploy_aio(device, noask=False):
             raise Exception('User aborted.')
     print('Unmounting device {} ...'.format(device))
     await run_command('udisksctl', 'unmount', '-f', '-b', device, allow_fail=True)
-    # await run_command('sudo', 'umount', device, allow_fail=True)
-    await run_command('sudo', 'mkfs.vfat', '-n', 'AIOBOOT', device)
+    await run_command('sudo', 'umount', device, allow_fail=True)
+    await run_command('sudo', 'mkfs.vfat', '-n', 'AIOBOOT', '-F', '32', device)
     aio_grub_dir = Path.cwd() / 'aio/aio_latest/AIO/grub/i386-pc'
     out, _, __ = await run_command('sudo', 'grub-bios-setup', '-d', aio_grub_dir, device)
     print(out)
@@ -55,4 +55,6 @@ async def deploy_aio(device, noask=False):
         shutil.copyfile(file, Path('/home/bruce/test') / file.relative_to(files_dir))
         pbar.update(file.stat().st_size)
     pbar.close()
+    print('Unmounting device {} ...'.format(device))
+    await run_command('udisksctl', 'unmount', '-f', '-b', device, allow_fail=True)
     print(bcolors.OKGREEN + bcolors.BOLD + 'All done. Have fun!' + bcolors.ENDC)
