@@ -31,13 +31,14 @@ async def get_mount_point(device):
     line = list(filter(lambda l: l.find('MountPoints:') >= 0, out.split('\n')))
     return line[0].strip().split()[1]
 
-async def deploy_aio(device, noask=False):
+async def deploy_aio(device, noask=False, efionly=True):
     commands = {
-        'grub-bios-setup': 'grub2',
         'udisksctl': 'udisks2',
         'wipefs': 'util-linux',
         'parted': 'parted'
     }
+    if not efionly:
+        commands['grub-install'] = 'grub2'
     for k in commands:
         if await check_exists(k):
             print('Found: {}'.format(k))
@@ -62,11 +63,12 @@ async def deploy_aio(device, noask=False):
     print('Copying AIO files to {} ...'.format(mounting_point))
     files_dir = Path.cwd() / 'aio/aio_latest'
     copyfiles(files_dir, mounting_point)
-    print('Copying grub files...')
-    files_dir = files_dir / 'AIO/grub'
-    copyfiles(files_dir, mounting_point + '/boot/grub')
-    print('Installing grub2...')
-    out, _, __ = await run_command('sudo', 'grub-install', '--target=i386-pc', '--root-directory=' + mounting_point, device)
+    if not efionly:
+        print('Copying grub files...')
+        files_dir = files_dir / 'AIO/grub'
+        copyfiles(files_dir, mounting_point + '/boot/grub')
+        print('Installing grub2...')
+        out, _, __ = await run_command('sudo', 'grub-install', '--target=i386-pc', '--root-directory=' + mounting_point, device)
     print('Unmounting device {} ...'.format(device))
     await run_command('udisksctl', 'unmount', '-f', '-b', device + '1', allow_fail=True)
     await run_command('sudo', 'sync', device, allow_fail=True)
