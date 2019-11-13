@@ -4,7 +4,7 @@ from pathlib import Path
 import tqdm
 import shutil
 import re
-from .util import calculate_size, bcolors
+from .util import calculate_size, bcolors, copyfiles
 from . import CHUNK_SIZE
 
 async def run_command(*args, allow_fail=False):
@@ -55,21 +55,18 @@ async def deploy_aio(device, noask=False):
     await run_command('sudo', 'parted', device, 'mklabel', 'msdos')
     await run_command('sudo', 'parted', '--align=opt', device, 'mkpart', 'primary', '0%', '100%')
     await run_command('sudo', 'mkfs.vfat', '-n', 'AIOBOOT', '-F', '32', device + '1')
-    aio_grub_dir = Path.cwd() / 'aio/aio_latest/AIO/grub/i386-pc'
-    out, _, __ = await run_command('sudo', 'grub-install', '--target=i386-pc', device)
-    print(out)
     print('Mounting device {} ...'.format(device))
     await asyncio.sleep(3)
     await run_command('udisksctl', 'mount', '-b', device + '1')
     mounting_point = await get_mount_point(device)
     print('Copying AIO files to {} ...'.format(mounting_point))
     files_dir = Path.cwd() / 'aio/aio_latest'
-    pbar = tqdm.tqdm(total=calculate_size(files_dir), unit='B', unit_scale=True)
-    for file in [f for f in files_dir.glob('**/*') if f.is_file()]:
-        Path.mkdir((Path(mounting_point) / file.relative_to(files_dir)).parent, parents=True, exist_ok=True)
-        shutil.copyfile(file, Path(mounting_point) / file.relative_to(files_dir))
-        pbar.update(file.stat().st_size)
-    pbar.close()
+    copyfiles(files_dir, mounting_point)
+    print('Copying grub files...')
+    files_dir = files_dir / 'AIO/grub'
+    copyfiles(files_dir, mounting_point + '/boot/grub')
+    print('Installing grub2...')
+    out, _, __ = await run_command('sudo', 'grub-install', '--target=i386-pc', '--root-directory=' + mounting_point, device)
     print('Unmounting device {} ...'.format(device))
     await run_command('udisksctl', 'unmount', '-f', '-b', device + '1', allow_fail=True)
     await run_command('sudo', 'sync', device, allow_fail=True)
