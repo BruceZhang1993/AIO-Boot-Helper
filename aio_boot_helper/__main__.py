@@ -21,7 +21,7 @@ async def prepare(args, _):
 
 async def deploy(args, _):
     if args.device:
-        await deploy_aio(args.device, noask=args.yes, efionly=args.efionly)
+        await deploy_aio(args.device, noask=args.yes, efionly=args.efionly, mbr=args.mbr, hybrid=args.hybrid)
     else:
         raise Exception('Please specify devname.')
 

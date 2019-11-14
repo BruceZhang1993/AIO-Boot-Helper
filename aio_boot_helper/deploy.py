@@ -31,7 +31,23 @@ async def get_mount_point(device):
     line = list(filter(lambda l: l.find('MountPoints:') >= 0, out.split('\n')))
     return line[0].strip().split()[1]
 
-async def deploy_aio(device, noask=False, efionly=True):
+async def partition_disk(device, mbr, hybrid):
+    print('Unmounting device {} ...'.format(device))
+    await run_command('udisksctl', 'unmount', '-f', '-b', device, allow_fail=True)
+    await run_command('udisksctl', 'unmount', '-f', '-b', device + '1', allow_fail=True)
+    await run_command('sudo', 'umount', device, allow_fail=True)
+    await run_command('sudo', 'wipefs', '--all', device)
+    if mbr:
+        await run_command('sudo', 'parted', device, 'mklabel', 'msdos')
+        await run_command('sudo', 'parted', '--align=opt', device, 'mkpart', 'primary', '0%', '100%')
+        await run_command('sudo', 'mkfs.vfat', '-n', 'AIOBOOT', '-F', '32', device + '1')
+    else:
+        pass
+    print('Mounting device {} ...'.format(device))
+    await asyncio.sleep(3)
+    await run_command('udisksctl', 'mount', '-b', device + '1')
+
+async def deploy_aio(device, noask=False, efionly=False, mbr=False, hybrid=False):
     commands = {
         'udisksctl': 'udisks2',
         'wipefs': 'util-linux',
@@ -48,17 +64,7 @@ async def deploy_aio(device, noask=False, efionly=True):
         print(bcolors.WARNING + bcolors.BOLD + '[DANGEROUS] This command will wrap out {}, please BACKUP your data first. \nInput `YES` and press [ENTER] to continue, [Ctrl-C] to abort: '.format(device), end=bcolors.ENDC)
         if input() != "YES":
             raise Exception('User aborted.')
-    print('Unmounting device {} ...'.format(device))
-    await run_command('udisksctl', 'unmount', '-f', '-b', device, allow_fail=True)
-    await run_command('udisksctl', 'unmount', '-f', '-b', device + '1', allow_fail=True)
-    await run_command('sudo', 'umount', device, allow_fail=True)
-    await run_command('sudo', 'wipefs', '--all', device)
-    await run_command('sudo', 'parted', device, 'mklabel', 'msdos')
-    await run_command('sudo', 'parted', '--align=opt', device, 'mkpart', 'primary', '0%', '100%')
-    await run_command('sudo', 'mkfs.vfat', '-n', 'AIOBOOT', '-F', '32', device + '1')
-    print('Mounting device {} ...'.format(device))
-    await asyncio.sleep(3)
-    await run_command('udisksctl', 'mount', '-b', device + '1')
+    await partition_disk(device, mbr, hybrid)
     mounting_point = await get_mount_point(device)
     print('Copying AIO files to {} ...'.format(mounting_point))
     files_dir = Path.cwd() / 'aio/aio_latest'
