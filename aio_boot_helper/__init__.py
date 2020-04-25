@@ -9,12 +9,16 @@ CHUNK_SIZE = 16 * 1024
 COMMANDS = ['help', 'prepare', 'deploy', 'auto-deploy']
 
 def ensure_dirs():
-    """
-    """
+    """Ensure required directories exists"""
     if not Path.exists(CACHE_DIR):
         Path.mkdir(CACHE_DIR, parents=True, exist_ok=True)
 
 def init_args():
+    """Parse arguments from cli
+
+    :return: Namespace for reading arguments, argument parser instance
+    :rtype: Namespace, ArgumentParser
+    """
     parser = argparse.ArgumentParser(description='AIO-Boot Helper')
     parser.add_argument('command', choices=COMMANDS, help='Command to use')
     parser.add_argument('device', nargs='?', default=None, help='Device to deploy')
