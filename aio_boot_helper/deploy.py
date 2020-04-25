@@ -1,5 +1,6 @@
 import asyncio
 import os
+import sys
 from pathlib import Path
 import tqdm
 import shutil
@@ -23,7 +24,7 @@ async def check_exists(command):
         'which', command,
         stderr=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE)
     await process.communicate()
-    return process.returncode == 0
+    return command, process.returncode == 0
 
 async def get_mount_point(device):
     await asyncio.sleep(1)
@@ -40,18 +41,27 @@ async def deploy_aio(device, noask=False, efionly=True):
     }
     if not efionly:
         commands['grub-install'] = 'grub2'
-    for k in commands:
-        if await check_exists(k):
-            print('Found: {}'.format(k))
+    check_tasks = [check_exists(k) for k in commands]
+    done, _ = await asyncio.wait(check_tasks)
+    for task in done:
+        command, installed = task.result()
+        if installed:
+            print(bcolors.BOLD + 'Found:' + bcolors.ENDC + ' {}'.format(command))
         else:
-            raise Exception('Please install {}.'.format(commands.get(k)))
+            raise Exception('{} is not found. Please install {}.'.format(command, commands[command]))
     if not noask:
         print(bcolors.WARNING + bcolors.BOLD + '[DANGEROUS] This command will wrap out {}, please BACKUP your data first. \nInput `YES` and press [ENTER] to continue, [Ctrl-C] to abort: '.format(device), end=bcolors.ENDC)
         if input() != "YES":
             raise Exception('User aborted.')
     print('Unmounting device {} ...'.format(device))
-    await run_command('udisksctl', 'unmount', '-f', '-b', device, allow_fail=True)
-    await run_command('udisksctl', 'unmount', '-f', '-b', device + '1', allow_fail=True)
+    unmount_tasks = []
+    unmount_tasks.append(run_command('udisksctl', 'unmount', '-f', '-b', device, allow_fail=True))
+    unmount_tasks.append(run_command('udisksctl', 'unmount', '-f', '-b', device + '1', allow_fail=True))
+    done, _ = await asyncio.wait(unmount_tasks)
+    for task in done:
+        out, err, code = task.result()
+        if code != 0:
+            print(bcolors.WARNING + bcolors.BOLD + err, end=bcolors.ENDC + '\n')
     await run_command('pkexec', 'umount', device, allow_fail=True)
     await run_command('pkexec', 'wipefs', '--all', device)
     await run_command('pkexec', 'parted', device, 'mklabel', 'msdos')
@@ -71,7 +81,10 @@ async def deploy_aio(device, noask=False, efionly=True):
         print('Installing grub2...')
         out, _, __ = await run_command('sudo', 'grub-install', '--target=i386-pc', '--root-directory=' + mounting_point, device)
     print('Unmounting device {} ...'.format(device))
+    sync_tasks = [run_command('pkexec', 'sync', device, allow_fail=True), run_command('pkexec', 'sync', device + '1', allow_fail=True)]
+    done, _ = await asyncio.wait(sync_tasks)
+    for task in done:
+        if code != 0:
+            print(bcolors.WARNING + bcolors.BOLD + err, end=bcolors.ENDC + '\n')
     await run_command('udisksctl', 'unmount', '-f', '-b', device + '1', allow_fail=True)
-    await run_command('pkexec', 'sync', device, allow_fail=True)
-    await run_command('pkexec', 'sync', device + '1', allow_fail=True)
     print(bcolors.OKGREEN + bcolors.BOLD + 'All done. Have fun!' + bcolors.ENDC)
