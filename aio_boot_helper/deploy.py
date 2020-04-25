@@ -35,7 +35,8 @@ async def deploy_aio(device, noask=False, efionly=True):
     commands = {
         'udisksctl': 'udisks2',
         'wipefs': 'util-linux',
-        'parted': 'parted'
+        'parted': 'parted',
+        'pkexec': 'polkit',
     }
     if not efionly:
         commands['grub-install'] = 'grub2'
@@ -51,11 +52,11 @@ async def deploy_aio(device, noask=False, efionly=True):
     print('Unmounting device {} ...'.format(device))
     await run_command('udisksctl', 'unmount', '-f', '-b', device, allow_fail=True)
     await run_command('udisksctl', 'unmount', '-f', '-b', device + '1', allow_fail=True)
-    await run_command('sudo', 'umount', device, allow_fail=True)
-    await run_command('sudo', 'wipefs', '--all', device)
-    await run_command('sudo', 'parted', device, 'mklabel', 'msdos')
-    await run_command('sudo', 'parted', '--align=opt', device, 'mkpart', 'primary', '0%', '100%')
-    await run_command('sudo', 'mkfs.vfat', '-n', 'AIOBOOT', '-F', '32', device + '1')
+    await run_command('pkexec', 'umount', device, allow_fail=True)
+    await run_command('pkexec', 'wipefs', '--all', device)
+    await run_command('pkexec', 'parted', device, 'mklabel', 'msdos')
+    await run_command('pkexec', 'parted', '--align=opt', device, 'mkpart', 'primary', '0%', '100%')
+    await run_command('pkexec', 'mkfs.vfat', '-n', 'AIOBOOT', '-F', '32', device + '1')
     print('Mounting device {} ...'.format(device))
     await asyncio.sleep(3)
     await run_command('udisksctl', 'mount', '-b', device + '1')
@@ -71,6 +72,6 @@ async def deploy_aio(device, noask=False, efionly=True):
         out, _, __ = await run_command('sudo', 'grub-install', '--target=i386-pc', '--root-directory=' + mounting_point, device)
     print('Unmounting device {} ...'.format(device))
     await run_command('udisksctl', 'unmount', '-f', '-b', device + '1', allow_fail=True)
-    await run_command('sudo', 'sync', device, allow_fail=True)
-    await run_command('sudo', 'sync', device + '1', allow_fail=True)
+    await run_command('pkexec', 'sync', device, allow_fail=True)
+    await run_command('pkexec', 'sync', device + '1', allow_fail=True)
     print(bcolors.OKGREEN + bcolors.BOLD + 'All done. Have fun!' + bcolors.ENDC)

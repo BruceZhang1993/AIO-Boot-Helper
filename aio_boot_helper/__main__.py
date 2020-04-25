@@ -11,10 +11,10 @@ async def help(args, parser: argparse.ArgumentParser):
     parser.print_help()
 
 async def prepare(args, _):
-    uri = await get_latest_release('nguyentumine', 'AIO-Boot', args.refresh)
-    print(bcolors.BOLD + 'Downloading:' + bcolors.ENDC + ' {}'.format(uri))
-    if uri:
-        await download(uri, args.overwrite)
+    data = await get_latest_release('nguyentumine', 'AIO-Boot', True)
+    print(bcolors.BOLD + 'Downloading:' + bcolors.ENDC + ' {}'.format(data.get('uri')))
+    if data:
+        await download(data, args.overwrite)
     if Path.exists(Path.cwd() / 'aio' / DOWN_FILENAME):
         print(bcolors.BOLD + 'Decompressing:' + bcolors.ENDC + ' {}'.format(Path.cwd() / 'aio' / DOWN_FILENAME))
         decompress_file(Path.cwd() / 'aio' / DOWN_FILENAME)

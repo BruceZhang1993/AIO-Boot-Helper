@@ -18,7 +18,6 @@ def init_args():
     parser = argparse.ArgumentParser(description='AIO-Boot Helper')
     parser.add_argument('command', choices=COMMANDS, help='Command to use')
     parser.add_argument('device', nargs='?', default=None, help='Device to deploy')
-    parser.add_argument('--refresh', '-r', action='store_true', default=False, help='Refresh latest release (prepare)')
     parser.add_argument('--overwrite', '-o', action='store_true', default=False, help='Force download file (prepare)')
     parser.add_argument('--yes', '-y', action='store_true', default=False, help='Disable interactive operations [DANGEROUS] (deploy)')
     parser.add_argument('--efionly', action='store_true', default=False, help='Use EFI-only mode (deploy)')

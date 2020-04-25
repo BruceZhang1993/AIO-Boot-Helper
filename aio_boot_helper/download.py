@@ -12,17 +12,17 @@ async def _get(session, url):
     async with session.get(url) as response:
         return await response.text()
 
-def _parse(data: dict) -> str:
+def _parse(data: dict) -> dict:
     for asset in data.get('assets'):
         if asset.get('browser_download_url').endswith('.7z'):
-            return asset.get('browser_download_url')
+            return {'uri': asset.get('browser_download_url'), 'length': asset.get('size')}
     return None
 
 async def get_latest_release(owner, repo, refresh=False):
     if not refresh and Path.exists(CACHE_LATEST_RELEASE):
         print('Latest version cached, add `--refresh` to re-check.')
         with open(CACHE_LATEST_RELEASE, 'r') as f:
-            data = json.load(f) 
+            data = json.load(f)
             return _parse(data)
     else:
         async with aiohttp.ClientSession() as session:
@@ -32,12 +32,12 @@ async def get_latest_release(owner, repo, refresh=False):
             data = json.loads(content)
             return _parse(data)
 
-async def download(uri: str, overwrite=False):
+async def download(data: dict, overwrite=False):
     Path.mkdir(Path.cwd() / 'aio', exist_ok=True)
     if overwrite or not Path.exists(Path.cwd() / 'aio' / DOWN_FILENAME):
         async with aiohttp.ClientSession() as session:
-            async with session.get(uri) as response:
-                length = int(response.headers.get('content-length'))
+            async with session.get(data.get('uri')) as response:
+                length = int(data.get('length'))
                 pbar = tqdm.tqdm(total=length, unit='B', unit_scale=True)
                 with open(Path.cwd() / 'aio' / DOWN_FILENAME, 'wb') as f:
                     while True:
